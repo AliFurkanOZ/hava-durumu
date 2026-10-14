@@ -1,0 +1,87 @@
+# ==========================================
+# GÜVENLİK / HASSAS BİLGİLER (API Keys, Secrets)
+# ==========================================
+.env
+.env.*
+.env.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# ==========================================
+# PYTHON (Sanal Ortamlar & Derleme Dosyaları)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Sanal ortamlar (Virtual Environments)
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Test & Kapsam Raporları
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ==========================================
+# IDE & EDİTÖR DOSYALARI
+# ==========================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# ==========================================
+# İŞLETİM SİSTEMİ DOSYALARI
+# ==========================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ==========================================
+# LOGLAR & GEÇİCİ DOSYALAR
+# ==========================================
+*.log
+logs/
+
+# ==========================================
+# KAFKA / DOCKER VERİLERİ
+# ==========================================
+kafka_data/
+
+# ==========================================
+# DOKÜMANLAR (İsteğe bağlı)
+# Dokümanları GitHub'a yüklemek isterseniz aşağıdaki satırın başına # koyun.
+# ==========================================
+/dokumanlar/

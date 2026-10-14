@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌍 Canlı Hava Durumu — Kafka Stream</title>
+  <meta name="description" content="Kafka ile gerçek zamanlı hava durumu takip sistemi. İstanbul, Ankara, İzmir, Bursa ve Antalya için canlı hava durumu verileri.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-card: rgba(17, 24, 39, 0.7);
+      --bg-card-hover: rgba(30, 41, 59, 0.8);
+      --border: rgba(71, 85, 105, 0.3);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #38bdf8;
+      --accent-cyan: #22d3ee;
+      --accent-purple: #a78bfa;
+      --accent-green: #4ade80;
+      --accent-red: #f87171;
+      --accent-orange: #fb923c;
+      --accent-yellow: #facc15;
+      --gradient-main: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+      --gradient-card: linear-gradient(145deg, rgba(15, 23, 42, 0.6), rgba(30, 41, 59, 0.4));
+      --shadow-glow: 0 0 40px rgba(56, 189, 248, 0.1);
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: 
+        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(14, 165, 233, 0.08), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(139, 92, 246, 0.06), transparent),
+        radial-gradient(ellipse 50% 60% at 50% 80%, rgba(34, 211, 238, 0.05), transparent);
+      pointer-events: none;
+      z-index: 0;
+      animation: bgShift 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgShift {
+      0% { opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { opacity: 0.8; }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--gradient-main);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
+    }
+
+    .logo-text h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: var(--gradient-main);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-text p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    /* Status Badge */
+    #status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      transition: all 0.4s ease;
+    }
+
+    #status .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+
+    #status.connected {
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.3);
+      color: var(--accent-green);
+    }
+    #status.connected .dot {
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 2s infinite;
+    }
+
+    #status.disconnected {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: var(--accent-red);
+    }
+    #status.disconnected .dot {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    /* Stats Bar */
+    .stats-bar {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .stat-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      backdrop-filter: blur(10px);
+    }
+
+    .stat-chip .value {
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    /* Cards Grid */
+    #cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--gradient-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--gradient-main);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(56, 189, 248, 0.3);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .city-info {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .city-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      background: rgba(56, 189, 248, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    .city-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      text-transform: capitalize;
+      letter-spacing: -0.01em;
+    }
+
+    .city-coords {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Alert Badges */
+    .alert-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 100px;
+      white-space: nowrap;
+    }
+
+    .alert-normal { background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.2); }
+    .alert-low { background: rgba(250, 204, 21, 0.12); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.2); }
+    .alert-freeze { background: rgba(96, 165, 250, 0.12); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.2); }
+    .alert-high { background: rgba(251, 146, 60, 0.12); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.2); }
+    .alert-extreme { background: rgba(248, 113, 113, 0.12); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.2); }
+
+    /* Temperature */
+    .temp-section {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .temp-value {
+      font-size: 3rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .temp-unit {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .weather-icon {
+      width: 50px;
+      height: 50px;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+    }
+
+    .description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .feels-like {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    /* Metrics Grid */
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+
+    .metric {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(51, 65, 85, 0.2);
+    }
+
+    .metric-icon {
+      font-size: 0.9rem;
+      width: 24px;
+      text-align: center;
+    }
+
+    .metric-data {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-value {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .metric-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Updated Time */
+    .updated {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 1rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid rgba(51, 65, 85, 0.2);
+    }
+
+    /* Animation for new data */
+    @keyframes cardFlash {
+      0% { border-color: rgba(56, 189, 248, 0.5); box-shadow: 0 0 20px rgba(56, 189, 248, 0.15); }
+      100% { border-color: var(--border); box-shadow: none; }
+    }
+
+    .card.flash {
+      animation: cardFlash 1.5s ease-out;
+    }
+
+    /* Raw Data Panel */
+    .raw-section {
+      margin-top: 1.5rem;
+    }
+
+    #raw-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      color: var(--accent-blue);
+      font-size: 0.85rem;
+      font-weight: 500;
+      user-select: none;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      transition: all 0.2s ease;
+    }
+
+    #raw-toggle:hover {
+      background: rgba(56, 189, 248, 0.15);
+    }
+
+    #raw-box {
+      display: none;
+      margin-top: 0.75rem;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      font-size: 0.78rem;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+      color: var(--accent-cyan);
+      line-height: 1.6;
+    }
+
+    #raw-box::-webkit-scrollbar { width: 6px; }
+    #raw-box::-webkit-scrollbar-track { background: transparent; }
+    #raw-box::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+
+    /* Empty state */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state .icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .empty-state h3 {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+      font-size: 0.85rem;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 2rem 0;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    .footer span {
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .container { padding: 1rem; }
+      .logo-text h1 { font-size: 1.2rem; }
+      #cards { grid-template-columns: 1fr; }
+      .temp-value { font-size: 2.5rem; }
+      .header-top { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-top">
+        <div class="logo">
+          <div class="logo-icon">⚡</div>
+          <div class="logo-text">
+            <h1>Canlı Hava Durumu</h1>
+            <p>Kafka Stream ile Gerçek Zamanlı</p>
+          </div>
+        </div>
+        <div id="status" class="disconnected">
+          <span class="dot"></span>
+          <span id="status-text">Bağlanıyor...</span>
+        </div>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-chip">
+          🏙️ Şehir: <span class="value" id="city-count">0</span>
+        </div>
+        <div class="stat-chip">
+          📨 Mesaj: <span class="value" id="msg-count">0</span>
+        </div>
+        <div class="stat-chip">
+          🕐 Son güncelleme: <span class="value" id="last-update">—</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- City Cards -->
+    <div id="cards">
+      <div class="empty-state">
+        <div class="icon">🛰️</div>
+        <h3>Veri bekleniyor...</h3>
+        <p>Kafka producer'dan ilk hava durumu verisi geldiğinde kartlar burada görünecek.</p>
+      </div>
+    </div>
+
+    <!-- Raw Data -->
+    <div class="raw-section">
+      <div id="raw-toggle">
+        <span>{ }</span> Ham JSON Verisi
+      </div>
+      <div id="raw-box"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      Apache <span>Kafka</span> + FastAPI + WebSocket ile gerçek zamanlı veri akışı
+    </footer>
+  </div>
+
+  <script>
+    const statusEl    = document.getElementById("status");
+    const statusText  = document.getElementById("status-text");
+    const cardsEl     = document.getElementById("cards");
+    const rawBox      = document.getElementById("raw-box");
+    const rawToggle   = document.getElementById("raw-toggle");
+    const cityCountEl = document.getElementById("city-count");
+    const msgCountEl  = document.getElementById("msg-count");
+    const lastUpdEl   = document.getElementById("last-update");
+
+    const cityData  = {};
+    let msgCount = 0;
+
+    // City emoji map
+    const cityEmojis = {
+      istanbul: "🌉",
+      ankara: "🏛️",
+      izmir: "🌊",
+      bursa: "🏔️",
+      antalya: "🏖️",
+      bitlis: "🏔️",
+      trabzon: "⛰️",
+    };
+
+    rawToggle.addEventListener("click", () => {
+      const isOpen = rawBox.style.display === "block";
+      rawBox.style.display = isOpen ? "none" : "block";
+      rawToggle.innerHTML = isOpen
+        ? '<span>{ }</span> Ham JSON Verisi'
+        : '<span>{ }</span> Ham JSON Gizle';
+    });
+
+    function formatTime(ts) {
+      return new Date(ts * 1000).toLocaleTimeString("tr-TR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    }
+
+    function getAlertClass(alert) {
+      if (!alert) return "alert-normal";
+      if (alert.includes("AŞIRI")) return "alert-extreme";
+      if (alert.includes("YÜKSEK")) return "alert-high";
+      if (alert.includes("DONMA")) return "alert-freeze";
+      if (alert.includes("DÜŞÜK")) return "alert-low";
+      return "alert-normal";
+    }
+
+    function getAlertShort(alert) {
+      if (!alert) return "Normal";
+      if (alert.includes("AŞIRI")) return "🔴 Aşırı Sıcak";
+      if (alert.includes("YÜKSEK")) return "🟠 Sıcak";
+      if (alert.includes("DONMA")) return "🔵 Don";
+      if (alert.includes("DÜŞÜK")) return "🟡 Soğuk";
+      return "🟢 Normal";
+    }
+
+    function getTempColor(temp) {
+      if (temp >= 35) return "linear-gradient(135deg, #f87171, #fb923c)";
+      if (temp >= 25) return "linear-gradient(135deg, #fb923c, #facc15)";
+      if (temp >= 15) return "linear-gradient(135deg, #38bdf8, #22d3ee)";
+      if (temp >= 5) return "linear-gradient(135deg, #22d3ee, #60a5fa)";
+      return "linear-gradient(135deg, #60a5fa, #a78bfa)";
+    }
+
+    function renderCards() {
+      const entries = Object.entries(cityData);
+      if (entries.length === 0) {
+        cardsEl.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">🛰️</div>
+            <h3>Veri bekleniyor...</h3>
+            <p>Kafka producer'dan ilk hava durumu verisi geldiğinde kartlar burada görünecek.</p>
+          </div>`;
+        return;
+      }
+
+      cardsEl.innerHTML = "";
+      for (const [city, d] of entries) {
+        const emoji = cityEmojis[city] || "🏙️";
+        const alertClass = getAlertClass(d.alert);
+        const alertShort = getAlertShort(d.alert);
+        const tempColor = getTempColor(d.temp_c);
+        const iconUrl = d.icon
+          ? `https://openweathermap.org/img/wn/${d.icon}@2x.png`
+          : "";
+
+        cardsEl.innerHTML += `
+          <div class="card flash" id="card-${city}">
+            <div class="card-header">
+              <div class="city-info">
+                <div class="city-icon">${emoji}</div>
+                <div>
+                  <div class="city-name">${d.city}</div>
+                  <div class="city-coords">${d.lat?.toFixed(2) ?? "—"}°N, ${d.lon?.toFixed(2) ?? "—"}°E</div>
+                </div>
+              </div>
+              <span class="alert-badge ${alertClass}">${alertShort}</span>
+            </div>
+
+            <div class="temp-section">
+              <span class="temp-value" style="background: ${tempColor}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${d.temp_c}°</span>
+              <span class="temp-unit">C</span>
+              ${iconUrl ? `<img class="weather-icon" src="${iconUrl}" alt="${d.description}" />` : ""}
+            </div>
+
+            <div class="description">
+              <span>${d.description}</span>
+              <span class="feels-like">• Hissedilen ${d.feels_like ?? d.temp_c}°C</span>
+            </div>
+
+            <div class="metrics">
+              <div class="metric">
+                <span class="metric-icon">💧</span>
+                <div class="metric-data">
+                  <span class="metric-value">${d.humidity}%</span>
+                  <span class="metric-label">Nem</span>
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric-icon">💨</span>
+                <div class="metric-data">
+                  <span class="metric-value">${d.wind_kmh} km/h</span>
+                  <span class="metric-label">Rüzgar</span>
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric-icon">🌡️</span>
+                <div class="metric-data">
+                  <span class="metric-value">${d.heat_index ?? "—"}°C</span>
+                  <span class="metric-label">Isı İndeksi</span>
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric-icon">🍃</span>
+                <div class="metric-data">
+                  <span class="metric-value">${d.wind_category ?? "—"}</span>
+                  <span class="metric-label">Rüzgar Tipi</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="updated">
+              <span>🕐</span> Son güncelleme: ${formatTime(d.timestamp)}
+            </div>
+          </div>`;
+      }
+    }
+
+    function connect() {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsHost = window.location.host || "localhost:8000";
+      const ws = new WebSocket(`${protocol}//${wsHost}/ws`);
+
+      ws.onopen = () => {
+        statusEl.className = "connected";
+        statusText.textContent = "Bağlı";
+      };
+
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        cityData[data.city] = data;
+        msgCount++;
+
+        renderCards();
+
+        cityCountEl.textContent = Object.keys(cityData).length;
+        msgCountEl.textContent = msgCount;
+        lastUpdEl.textContent = formatTime(data.timestamp);
+
+        rawBox.textContent = JSON.stringify(cityData, null, 2);
+      };
+
+      ws.onclose = () => {
+        statusEl.className = "disconnected";
+        statusText.textContent = "Bağlantı koptu — yeniden bağlanıyor...";
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => ws.close();
+    }
+
+    connect();
+  </script>
+</body>
+</html>
